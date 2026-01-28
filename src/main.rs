@@ -3,11 +3,20 @@ use async_runtime::{executor::Executor, sleep::Sleep};
 fn main() {
     let mut runtime = Executor::new();
 
-    runtime.add_task(task_one());
-    runtime.add_task(task_two());
+    runtime.add_task(task_one(), 1).unwrap();
+    runtime.add_task(task_two(), 2).unwrap();
 
     let result = runtime.select().unwrap();
     println!("The faster task was: {}", result);
+
+    let mut runtime = Executor::new();
+
+    runtime.add_task(task_one(), 1).unwrap();
+    runtime.add_task(task_two(), 2).unwrap();
+
+    let results = runtime.join();
+    println!("The first task returned: {}", results.get(&1).unwrap());
+    println!("The second task returned: {}", results.get(&2).unwrap());
 }
 
 async fn task_one() -> i32 {
