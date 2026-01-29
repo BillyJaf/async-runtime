@@ -1,35 +1,24 @@
-use async_runtime::{executor::Executor, sleep::Sleep};
+use async_runtime::{runtime::Runtime, sleep::Sleep};
 
 fn main() {
-    let mut runtime = Executor::new();
+    let runtime = Runtime::new();
 
-    runtime.add_task(task_one(), 1).unwrap();
-    runtime.add_task(task_two(), 2).unwrap();
+    runtime.spawn(async {
+        println!("Task 1 starting...");
+        Sleep::new(2).await;
+        println!("Task 1 finishing.");
+        1
+    });
+
+    runtime.spawn(async {
+        Sleep::new(1).await;
+        println!("Task 2 starting...");
+        Sleep::new(2).await;
+        println!("Task 1 finishing.");
+        2
+    });
 
     let result = runtime.select().unwrap();
-    println!("The faster task was: {}", result);
-
-    let mut runtime = Executor::new();
-
-    runtime.add_task(task_one(), 1).unwrap();
-    runtime.add_task(task_two(), 2).unwrap();
-
-    let results = runtime.join();
-    println!("The first task returned: {}", results.get(&1).unwrap());
-    println!("The second task returned: {}", results.get(&2).unwrap());
+    println!("The task that finished first was: {}", result);
 }
-
-async fn task_one() -> i32 {
-    Sleep::new(5).await;
-    println!("Hello from task one!");
-    return 1;
-}
-
-async fn task_two() -> i32 {
-    Sleep::new(2).await;
-    println!("Hello from task two!");
-    Sleep::new(4).await;
-    return 2;
-}
-
 

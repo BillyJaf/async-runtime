@@ -1,21 +1,25 @@
 use std::{
-    pin::Pin, sync::Arc, task::Waker
+    pin::Pin, 
+    sync::{Arc, Mutex, mpsc::SyncSender},
+    task::Wake
 };
 
-use crate::waker::ThreadWaker;
-
 pub struct Task<O> {
-    pub id: usize,
-    pub task: Pin<Box<dyn Future<Output = O> + Send>>,
-    pub waker: Waker
+    pub task: Mutex<Option<Pin<Box<dyn Future<Output = O> + Send>>>>,
+    pub task_sender: SyncSender<Arc<Task<O>>>,
 }
 
 impl<O> Task<O> {
-    pub fn new<T>(id: usize, unpinned_task: T) -> Self 
+    pub fn new<T>(task: T, task_sender: SyncSender<Arc<Task<O>>>) -> Self
     where T: Future<Output = O> + Send + 'static
-    {
-        let task = Box::pin(unpinned_task);
-        let waker = Waker::from(Arc::new(ThreadWaker::new()));
-        Task { id, task, waker }
+    {   
+        Task { task: Mutex::new(Some(Box::pin(task))), task_sender }
+    }
+}
+
+impl<O> Wake for Task<O> {
+    fn wake(self: Arc<Self>) {
+        let cloned = self.clone();
+        self.task_sender.try_send(cloned).expect("Too many tasks are queued.");
     }
 }
