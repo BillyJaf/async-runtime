@@ -14,7 +14,7 @@ fn main() {
         Sleep::new(1).await;
         println!("Task 2 starting...");
         Sleep::new(2).await;
-        println!("Task 1 finishing.");
+        println!("Task 2 finishing.");
         2
     });
 

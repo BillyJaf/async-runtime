@@ -1,6 +1,6 @@
-use std::{sync::mpsc::sync_channel, task::{Context, Poll, Waker}};
+use std::{sync::{Arc, mpsc::sync_channel}, task::{Context, Poll, Waker}};
 
-use crate::{executor::Executor, spawner::Spawner};
+use crate::{executor::Executor, spawner::Spawner, timer::{Timer, TIMER}};
 
 pub struct Runtime<O> {
     executor: Executor<O>,
@@ -11,6 +11,8 @@ impl<O: 'static> Runtime<O> {
     pub fn new() -> Self {
         const MAX_TASKS: usize = 1000;
         let (task_sender, task_queue) = sync_channel(MAX_TASKS);
+        let timer = TIMER.get_or_init(|| Arc::new(Timer::new())).clone();
+        timer.start();
         Runtime {
             executor: Executor::new(task_queue),
             spawner: Spawner::new(task_sender)

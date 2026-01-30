@@ -1,38 +1,20 @@
 use std::{
     pin::Pin, 
-    sync::{Arc, Mutex}, 
-    task::{Context, Poll, Waker}, 
-    thread, 
-    time::Duration
+    task::{Context, Poll}, 
+    time::{Duration, Instant}
 };
 
-pub struct Sleep {
-    sleep_state: Arc<Mutex<SleepState>>
-}
+use crate::timer::{TIMER};
 
-struct SleepState {
-    completed: bool,
-    waker: Option<Waker>
+pub struct Sleep {
+    instant_finish: Instant,
+    registered: bool,
 }
 
 impl Sleep {
     pub fn new(seconds: u64) -> Self {
-        let sleep_state = Arc::new(Mutex::new(SleepState {
-            completed: false,
-            waker: None,
-        }));
-
-        let sleep_state_clone = sleep_state.clone();
-        thread::spawn(move || {
-            thread::sleep(Duration::from_secs(seconds));
-            let mut sleep_state = sleep_state_clone.lock().unwrap();
-            sleep_state.completed = true;
-            if let Some(waker) = sleep_state.waker.take() {
-                waker.wake();
-            }
-        });
-
-        Sleep { sleep_state }
+        let instant_finish = Instant::now() + Duration::from_secs(seconds);
+        Sleep { instant_finish, registered: false }
     }
 }
 
@@ -40,12 +22,14 @@ impl Future for Sleep {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut sleep_state = self.sleep_state.lock().unwrap();
-        if sleep_state.completed {
-            Poll::Ready(())
-        } else {
-            sleep_state.waker = Some(cx.waker().clone());
-            Poll::Pending
+        if Instant::now() >= self.instant_finish {
+            return Poll::Ready(());
         }
+
+        if !self.registered {
+            let timer = TIMER.get().unwrap().clone();
+            timer.register(self.instant_finish, cx.waker().clone());
+        }
+        Poll::Pending
     }
 }
