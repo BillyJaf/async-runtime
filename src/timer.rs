@@ -1,43 +1,69 @@
 use std::{
     cmp::{Ordering, Reverse}, 
     collections::BinaryHeap, 
-    sync::{Arc, Condvar, Mutex, OnceLock}, 
+    sync::{Arc, Condvar, LazyLock, Mutex}, 
     task::Waker, 
     time::Instant
 };
 
-pub static TIMER: OnceLock<Arc<Timer>> = OnceLock::new();
+pub static TIMER: LazyLock<Arc<Timer>> = LazyLock::new(|| Arc::new(Timer::new()));
 
 #[derive(Debug)]
 pub struct Timer {
-    instants_and_wakers: Mutex<BinaryHeap<Reverse<InstantWaker>>>,
+    instants_and_wakers: Mutex<ShutdownAndHeap>,
     condvar: Condvar,
+}
+
+#[derive(Debug)]
+struct ShutdownAndHeap {
+    shutdown: bool,
+    heap: BinaryHeap<Reverse<InstantWaker>>,
 }
 
 #[derive(Debug)]
 struct InstantWaker {
     instant: Instant,
     waker: Waker
+
 }
 
 impl Timer {
-    pub fn new() -> Self {
-        Timer { instants_and_wakers: Mutex::new(BinaryHeap::new()), condvar: Condvar::new() }
+    fn new() -> Self {
+        Timer { 
+            instants_and_wakers: Mutex::new(
+                ShutdownAndHeap { 
+                    shutdown: false, 
+                    heap: BinaryHeap::new(),
+                }
+            ), 
+            condvar: Condvar::new(), 
+        }
     }
 
     pub fn start(self: Arc<Self>) {
         std::thread::spawn(move || 
-            loop {
-                let mut instants_and_wakers = self.instants_and_wakers.lock().unwrap();
-                while instants_and_wakers.peek().is_none() {
-                    instants_and_wakers = self.condvar.wait(instants_and_wakers).unwrap();
+            'task: loop {
+                let mut shutdown_and_heap = self.instants_and_wakers.lock().unwrap();
+
+                if shutdown_and_heap.shutdown {
+                    shutdown_and_heap.shutdown = false;
+                    break 'task;
                 }
 
-                while let Some(Reverse(instant_waker)) = instants_and_wakers.pop() {
+                while shutdown_and_heap.heap.peek().is_none() {
+                    shutdown_and_heap = self.condvar.wait(shutdown_and_heap).unwrap();
+
+                    if shutdown_and_heap.shutdown {
+                        shutdown_and_heap.shutdown = false;
+                        break 'task;
+                    }
+                }
+
+                while let Some(Reverse(instant_waker)) = shutdown_and_heap.heap.pop() {
                     if instant_waker.instant <= Instant::now() {
                         instant_waker.waker.wake();
                     } else {
-                        instants_and_wakers.push(Reverse(instant_waker));
+                        shutdown_and_heap.heap.push(Reverse(instant_waker));
                         break;
                     }
                 }
@@ -46,9 +72,16 @@ impl Timer {
     }
 
     pub fn register(self: Arc<Self>, instant: Instant, waker: Waker) {
-        let mut instants_and_wakers = self.instants_and_wakers.lock().unwrap();
-        instants_and_wakers.push(Reverse(InstantWaker { instant, waker }));
+        let mut shutdown_and_heap = self.instants_and_wakers.lock().unwrap();
+        shutdown_and_heap.heap.push(Reverse(InstantWaker { instant, waker }));
         self.condvar.notify_one();
+    }
+
+    pub fn shutdown_and_empty(self: Arc<Self>) {
+        let mut shutdown_and_heap = self.instants_and_wakers.lock().unwrap();
+        shutdown_and_heap.heap.clear();
+        shutdown_and_heap.shutdown = true;
+        self.condvar.notify_all();
     }
 }
 

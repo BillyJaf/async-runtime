@@ -28,8 +28,7 @@ impl Future for Sleep {
 
         if !self.registered {
             self.registered = true;
-            let timer = TIMER.get().unwrap().clone();
-            timer.register(self.instant_finish, cx.waker().clone());
+            TIMER.clone().register(self.instant_finish, cx.waker().clone());
         }
 
         Poll::Pending

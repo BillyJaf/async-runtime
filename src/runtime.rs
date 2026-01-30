@@ -1,8 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet}, sync::{Arc, mpsc::sync_channel}, task::{Context, Poll, Waker}
+    collections::{HashMap, HashSet}, 
+    sync::mpsc::sync_channel, 
+    task::{Context, Poll, Waker}
 };
 
-use crate::{executor::Executor, spawner::Spawner, timer::{Timer, TIMER}};
+use crate::{executor::Executor, spawner::Spawner, timer::TIMER};
 
 pub struct Runtime<O> {
     last_used_task_id: usize,
@@ -20,8 +22,7 @@ impl<O: 'static> Runtime<O> {
     pub fn new() -> Self {
         const MAX_TASKS: usize = 1000;
         let (task_sender, task_queue) = sync_channel(MAX_TASKS);
-        let timer = TIMER.get_or_init(|| Arc::new(Timer::new())).clone();
-        timer.start();
+        TIMER.clone().start();
         Runtime {
             last_used_task_id: 1,
             task_ids: HashSet::new(),
@@ -64,10 +65,14 @@ impl<O: 'static> Runtime<O> {
                 let context = &mut Context::from_waker(&waker);
                 match task.as_mut().poll(context) {
                     Poll::Pending => { *task_slot = Some(task); },
-                    Poll::Ready(output) => { return Some(output); }
+                    Poll::Ready(output) => { 
+                        TIMER.clone().shutdown_and_empty();
+                        return Some(output); 
+                    }
                 }
             }
         }
+        TIMER.clone().shutdown_and_empty();
         return None;
     }
 
@@ -87,7 +92,7 @@ impl<O: 'static> Runtime<O> {
                 }
             }
         }
-
+        TIMER.clone().shutdown_and_empty();
         return results_by_id;
     }
 }
