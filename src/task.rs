@@ -5,15 +5,16 @@ use std::{
 };
 
 pub struct Task<O> {
+    pub id: usize,
     pub task: Mutex<Option<Pin<Box<dyn Future<Output = O> + Send>>>>,
     pub task_sender: SyncSender<Arc<Task<O>>>,
 }
 
 impl<O> Task<O> {
-    pub fn new<T>(task: T, task_sender: SyncSender<Arc<Task<O>>>) -> Self
+    pub fn new<T>(id: usize, task: T, task_sender: SyncSender<Arc<Task<O>>>) -> Self
     where T: Future<Output = O> + Send + 'static
     {   
-        Task { task: Mutex::new(Some(Box::pin(task))), task_sender }
+        Task { id, task: Mutex::new(Some(Box::pin(task))), task_sender }
     }
 }
 

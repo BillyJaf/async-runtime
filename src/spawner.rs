@@ -14,10 +14,10 @@ impl<O> Spawner<O> {
         Spawner { task_sender }
     }
 
-    pub fn spawn<T>(&self, task: T)
+    pub fn spawn<T>(&self, id: usize, task: T)
     where T: Future<Output = O> + Send + 'static
     {
-        let task = Arc::new(Task::new(task, self.task_sender.clone()));
+        let task = Arc::new(Task::new(id, task, self.task_sender.clone()));
         self.task_sender.try_send(task).expect("Too many tasks are queued.");
     }
 }
