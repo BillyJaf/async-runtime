@@ -1,4 +1,7 @@
-use std::{sync::{Arc, mpsc::sync_channel}, task::{Context, Poll, Waker}};
+use std::{
+    sync::{Arc, mpsc::sync_channel}, 
+    task::{Context, Poll, Waker}
+};
 
 use crate::{executor::Executor, spawner::Spawner, timer::{Timer, TIMER}};
 

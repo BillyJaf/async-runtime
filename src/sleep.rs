@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant}
 };
 
-use crate::timer::{TIMER};
+use crate::timer::TIMER;
 
 pub struct Sleep {
     instant_finish: Instant,
@@ -21,15 +21,17 @@ impl Sleep {
 impl Future for Sleep {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if Instant::now() >= self.instant_finish {
             return Poll::Ready(());
         }
 
         if !self.registered {
+            self.registered = true;
             let timer = TIMER.get().unwrap().clone();
             timer.register(self.instant_finish, cx.waker().clone());
         }
+
         Poll::Pending
     }
 }

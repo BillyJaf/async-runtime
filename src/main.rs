@@ -1,4 +1,7 @@
-use async_runtime::{runtime::Runtime, sleep::Sleep};
+use async_runtime::{
+    runtime::Runtime, 
+    sleep::Sleep
+};
 
 fn main() {
     let runtime = Runtime::new();

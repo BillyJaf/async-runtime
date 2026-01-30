@@ -1,4 +1,7 @@
-use std::sync::{Arc, mpsc::Receiver};
+use std::sync::{
+    Arc, 
+    mpsc::Receiver
+};
 
 use crate::task::Task;
 
