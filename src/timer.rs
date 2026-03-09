@@ -8,23 +8,19 @@ use std::{
 
 pub static TIMER: LazyLock<Arc<Timer>> = LazyLock::new(|| Arc::new(Timer::new()));
 
-#[derive(Debug)]
 pub struct Timer {
     instants_and_wakers: Mutex<ShutdownAndHeap>,
     condvar: Condvar,
 }
 
-#[derive(Debug)]
 struct ShutdownAndHeap {
     shutdown: bool,
     heap: BinaryHeap<Reverse<InstantWaker>>,
 }
 
-#[derive(Debug)]
 struct InstantWaker {
     instant: Instant,
     waker: Waker
-
 }
 
 impl Timer {
@@ -81,7 +77,7 @@ impl Timer {
         let mut shutdown_and_heap = self.instants_and_wakers.lock().unwrap();
         shutdown_and_heap.heap.clear();
         shutdown_and_heap.shutdown = true;
-        self.condvar.notify_all();
+        self.condvar.notify_one();
     }
 }
 

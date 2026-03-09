@@ -1,6 +1,5 @@
 use std::sync::{
-    Arc, 
-    mpsc::SyncSender
+    Arc, mpsc::SyncSender
 };
 
 use crate::task::Task;
@@ -18,6 +17,9 @@ impl<O> Spawner<O> {
     where T: Future<Output = O> + Send + 'static
     {
         let task = Arc::new(Task::new(id, task, self.task_sender.clone()));
-        self.task_sender.try_send(task).expect("Too many tasks are queued.");
+        // Can safely call unwrap as the receiver will still be active while spawning.
+        // Both the join and select methods drop the spawner immediately - the receiver
+        // trivially still exists at this point of execution.
+        self.task_sender.try_send(task).unwrap();
     }
 }

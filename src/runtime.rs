@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet}, 
-    sync::mpsc::sync_channel, 
-    task::{Context, Poll, Waker}
+    sync::mpsc::sync_channel,
 };
 
 use crate::{executor::Executor, spawner::Spawner, timer::TIMER};
@@ -58,41 +57,11 @@ impl<O: 'static> Runtime<O> {
 
     pub fn select(self) -> Option<O> {
         drop(self.spawner);
-        while let Ok(locked_task) = self.executor.task_queue.recv() {
-            let mut task_slot = locked_task.task.lock().unwrap();
-            if let Some(mut task) = task_slot.take() {
-                let waker = Waker::from(locked_task.clone());
-                let context = &mut Context::from_waker(&waker);
-                match task.as_mut().poll(context) {
-                    Poll::Pending => { *task_slot = Some(task); },
-                    Poll::Ready(output) => { 
-                        TIMER.clone().shutdown_and_empty();
-                        return Some(output); 
-                    }
-                }
-            }
-        }
-        TIMER.clone().shutdown_and_empty();
-        return None;
+        self.executor.select()
     }
 
      pub fn join(self) -> HashMap<usize, O> {
         drop(self.spawner);
-
-        let mut results_by_id: HashMap<usize, O> = HashMap::new();
-
-        while let Ok(locked_task) = self.executor.task_queue.recv() {
-            let mut task_slot = locked_task.task.lock().unwrap();
-            if let Some(mut task) = task_slot.take() {
-                let waker = Waker::from(locked_task.clone());
-                let context = &mut Context::from_waker(&waker);
-                match task.as_mut().poll(context) {
-                    Poll::Pending => { *task_slot = Some(task); },
-                    Poll::Ready(output) => { results_by_id.insert(locked_task.id, output); }
-                }
-            }
-        }
-        TIMER.clone().shutdown_and_empty();
-        return results_by_id;
+        self.executor.join()
     }
 }
